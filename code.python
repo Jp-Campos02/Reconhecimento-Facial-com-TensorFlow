@@ -1,0 +1,86 @@
+##1. Extração do Arquivo ZIP
+Descompactamos o arquivo localizado em /content/archive (2).zip.
+import zipfile
+import os
+
+def extrair_arquivo_zip(zip_path, extract_to):
+    """Extrai o conteúdo de um arquivo ZIP."""
+    if not os.path.exists(extract_to):
+        os.makedirs(extract_to)
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        zip_ref.extractall(extract_to)
+
+# Caminho do arquivo ZIP e pasta de destino
+ZIP_PATH = "/content/archive (2).zip"
+EXTRACT_TO = "/content/dataset/YaleFaces"
+
+# Extrair os dados
+extrair_arquivo_zip(ZIP_PATH, EXTRACT_TO)
+print("Arquivos extraídos com sucesso!")
+##2. Carregar e Pré-processar os Dados
+Agora ajustamos o código para carregar os dados extraídos da pasta /content/dataset/YaleFaces.
+
+
+import cv2
+import numpy as np
+
+def carregar_dados(caminho, img_size=(128, 128)):
+    """Carrega imagens e rótulos do dataset."""
+    imagens, labels = [], []
+    classes = sorted(os.listdir(caminho))
+    for label, classe in enumerate(classes):
+        classe_path = os.path.join(caminho, classe)
+        for img_file in os.listdir(classe_path):
+            img_path = os.path.join(classe_path, img_file)
+            img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)  # Escala de cinza
+            img = cv2.resize(img, img_size)  # Redimensiona
+            imagens.append(img)
+            labels.append(label)
+    imagens = np.array(imagens).reshape(-1, img_size[0], img_size[1], 1) / 255.0  # Normaliza
+    labels = np.array(labels)
+    return imagens, labels
+
+# Carregar os dados
+DATASET_PATH = EXTRACT_TO
+imagens, labels = carregar_dados(DATASET_PATH)
+print(f"Dados carregados! Total de imagens: {len(imagens)}")
+##3. Divisão Treino/Teste
+Dividimos os dados em treino e teste, usando 80% para treino e 20% para teste.
+
+from sklearn.model_selection import train_test_split
+
+X_train, X_test, y_train, y_test = train_test_split(imagens, labels, test_size=0.2, random_state=42)
+print(f"Tamanho do treino: {len(X_train)}, Tamanho do teste: {len(X_test)}")
+##4. Criar e Treinar o Modelo
+Criamos o modelo e iniciamos o treinamento.
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Flatten
+
+# Criar o modelo
+def criar_modelo(num_classes):
+    modelo = Sequential([
+        Flatten(input_shape=(128, 128, 1)),
+        Dense(128, activation='relu'),
+        Dense(64, activation='relu'),
+        Dense(num_classes, activation='softmax')
+    ])
+    modelo.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    return modelo
+
+# Instanciar e treinar o modelo
+modelo = criar_modelo(num_classes=len(np.unique(labels)))
+
+EPOCHS = 10
+BATCH_SIZE = 16
+
+modelo.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=EPOCHS, batch_size=BATCH_SIZE)
+5. Avaliação do Modelo
+Após o treinamento, avaliamos o desempenho.
+
+python
+Copiar
+Editar
+# Avaliar o modelo no conjunto de teste
+loss, accuracy = modelo.evaluate(X_test, y_test)
+print(f"Perda: {loss:.4f}, Precisão: {accuracy:.4f}")
